@@ -12,7 +12,6 @@ const SCORE_COLORS = {
 };
 
 const GAUGE_RADIUS = 120;
-const GAUGE_STROKE = 16;
 const GAUGE_CX = 150;
 const GAUGE_CY = 140;
 
@@ -121,20 +120,10 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         return this.gaugeArcLength - this.gaugeFilledLength;
     }
 
-    get gaugeDashArray() {
-        return `${this.gaugeFilledLength} ${this.gaugeEmptyLength}`;
-    }
-
-    get gaugeGradientId() {
-        return 'gaugeGradient';
-    }
-
-    get gaugeGlowFilter() {
-        return 'url(#gaugeGlow)';
-    }
-
-    get gaugeGradientUrl() {
-        return 'url(#gaugeGradient)';
+    get gaugeArcStyle() {
+        const filled = this.gaugeFilledLength;
+        const empty = this.gaugeEmptyLength;
+        return `stroke-dasharray: ${filled} ${empty}; filter: drop-shadow(0 0 6px ${this.scoreColor}80);`;
     }
 
     get scoreDisplayX() {
@@ -149,19 +138,6 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         return GAUGE_CY + 25;
     }
 
-    get gaugeTrackColor() {
-        return '#e5e7eb';
-    }
-
-    get gaugeStrokeWidth() {
-        return GAUGE_STROKE;
-    }
-
-    get glowColor() {
-        const c = this.scoreColor;
-        return c + '80'; // 50% opacity
-    }
-
     // ─── Factors ───────────────────────────────────────────────────
 
     get factors() {
@@ -172,7 +148,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
             return {
                 ...f,
                 key,
-                barWidth: `${f.score}%`,
+                barWidth: `width: ${f.score}%`,
                 barClass: `factor-bar factor-bar--${f.status}`,
                 statusIcon: this.getStatusIcon(f.status),
                 statusClass: `factor-status factor-status--${f.status}`,
@@ -274,10 +250,6 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
 
     get trendClass() {
         return `trend-indicator trend-indicator--${this.trendDirection}`;
-    }
-
-    get sparklineGradientUrl() {
-        return 'url(#sparklineGrad)';
     }
 
     // ─── Prediction ────────────────────────────────────────────────

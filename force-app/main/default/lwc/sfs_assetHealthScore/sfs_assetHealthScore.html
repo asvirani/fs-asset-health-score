@@ -25,41 +25,24 @@
                     <h2 class="section-header">Enhanced Asset Health Score</h2>
                     <div class="gauge-wrapper">
                         <svg viewBox="0 0 300 175" class="gauge-svg" xmlns="http://www.w3.org/2000/svg">
-                            <defs>
-                                <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
-                                    <stop offset="35%" style="stop-color:#f97316;stop-opacity:1" />
-                                    <stop offset="50%" style="stop-color:#eab308;stop-opacity:1" />
-                                    <stop offset="75%" style="stop-color:#22c55e;stop-opacity:1" />
-                                    <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
-                                </linearGradient>
-                                <filter id="gaugeGlow" x="-20%" y="-20%" width="140%" height="140%">
-                                    <feGaussianBlur stdDeviation="4" result="blur" />
-                                    <feMerge>
-                                        <feMergeNode in="blur" />
-                                        <feMergeNode in="SourceGraphic" />
-                                    </feMerge>
-                                </filter>
-                            </defs>
 
                             <!-- Track -->
                             <path
                                 d={gaugeArcPath}
                                 fill="none"
-                                stroke={gaugeTrackColor}
-                                stroke-width={gaugeStrokeWidth}
+                                stroke="#e5e7eb"
+                                stroke-width="16"
                                 stroke-linecap="round"
                             />
 
-                            <!-- Filled Arc -->
+                            <!-- Filled Arc — uses inline style for dasharray (LWC shadow DOM safe) -->
                             <path
                                 d={gaugeArcPath}
                                 fill="none"
-                                stroke={gaugeGradientUrl}
-                                stroke-width={gaugeStrokeWidth}
+                                stroke={scoreColor}
+                                stroke-width="16"
                                 stroke-linecap="round"
-                                stroke-dasharray={gaugeDashArray}
-                                filter={gaugeGlowFilter}
+                                style={gaugeArcStyle}
                                 class="gauge-fill"
                             />
 
@@ -137,16 +120,10 @@
                     </div>
                     <div class="sparkline-wrapper">
                         <svg viewBox="0 0 280 72" class="sparkline-svg" xmlns="http://www.w3.org/2000/svg">
-                            <defs>
-                                <linearGradient id="sparklineGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.3" />
-                                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.02" />
-                                </linearGradient>
-                            </defs>
-                            <!-- Area fill -->
+                            <!-- Area fill — solid color since url() breaks in shadow DOM -->
                             <polygon
                                 points={sparklineAreaPoints}
-                                fill={sparklineGradientUrl}
+                                fill="rgba(59, 130, 246, 0.12)"
                             />
                             <!-- Line -->
                             <polyline
