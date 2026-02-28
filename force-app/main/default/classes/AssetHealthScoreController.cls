@@ -5,6 +5,24 @@ public with sharing class AssetHealthScoreController {
     private static final Decimal WARRANTY_WEIGHT = 0.25;
     private static final Decimal CASE_WEIGHT = 0.40;
 
+    // ─── Record ID Resolution ─────────────────────────────────────────
+
+    @AuraEnabled(cacheable=true)
+    public static Id resolveAssetId(Id recordId) {
+        String prefix = String.valueOf(recordId).substring(0, 3);
+        // Asset prefix = 02i, WorkOrder prefix = 0WO
+        if (prefix == '0WO') {
+            List<WorkOrder> wos = [
+                SELECT AssetId FROM WorkOrder WHERE Id = :recordId LIMIT 1
+            ];
+            if (!wos.isEmpty() && wos[0].AssetId != null) {
+                return wos[0].AssetId;
+            }
+            return null;
+        }
+        return recordId;
+    }
+
     // ─── Main Data Fetch ───────────────────────────────────────────────
 
     @AuraEnabled(cacheable=true)

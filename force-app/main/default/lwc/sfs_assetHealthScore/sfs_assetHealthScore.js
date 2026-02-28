@@ -1,6 +1,7 @@
 import { LightningElement, api, wire } from 'lwc';
 import { NavigationMixin } from 'lightning/navigation';
 import getHealthScore from '@salesforce/apex/AssetHealthScoreController.getHealthScore';
+import resolveAssetId from '@salesforce/apex/AssetHealthScoreController.resolveAssetId';
 
 const SCORE_COLORS = {
     critical: '#ef4444',
@@ -23,8 +24,25 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
     isLoading = true;
     animatedScore = 0;
     expandedFactors = {};
+    resolvedAssetId;
 
-    @wire(getHealthScore, { assetId: '$recordId' })
+    // Step 1: Resolve the AssetId (handles both Asset and WorkOrder pages)
+    @wire(resolveAssetId, { recordId: '$recordId' })
+    wiredResolve({ error, data }) {
+        if (data) {
+            this.resolvedAssetId = data;
+            this.error = undefined;
+        } else if (data === null) {
+            this.error = 'This work order has no associated asset.';
+            this.isLoading = false;
+        } else if (error) {
+            this.error = error.body?.message || 'Unable to resolve asset';
+            this.isLoading = false;
+        }
+    }
+
+    // Step 2: Fetch health score using the resolved AssetId
+    @wire(getHealthScore, { assetId: '$resolvedAssetId' })
     wiredHealth({ error, data }) {
         if (data) {
             this.healthData = data;
@@ -307,6 +325,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
     }
 
     handleCreateWorkOrder() {
+        const assetId = this.resolvedAssetId || this.recordId;
         this[NavigationMixin.Navigate]({
             type: 'standard__objectPage',
             attributes: {
@@ -314,7 +333,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
                 actionName: 'new'
             },
             state: {
-                defaultFieldValues: `AssetId=${this.recordId}`
+                defaultFieldValues: `AssetId=${assetId}`
             }
         });
     }
