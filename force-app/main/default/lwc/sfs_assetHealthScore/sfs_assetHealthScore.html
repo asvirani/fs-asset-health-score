@@ -159,22 +159,21 @@
                     </div>
                 </div>
 
-                <!-- ═══ PREDICTED FAILURE ═══ -->
-                <div class={predictionClass}>
-                    <div class="prediction-content">
-                        <div class="prediction-icon">
-                            <lightning-icon icon-name={predictionIcon} size="small"></lightning-icon>
-                        </div>
-                        <div class="prediction-info">
-                            <div class="prediction-main">
-                                <span class="prediction-label">Estimated failure in</span>
-                                <span class="prediction-days">{predictionDays} days</span>
+                <!-- ═══ AGE & USAGE METRICS ═══ -->
+                <div class="metrics-section">
+                    <h3 class="subsection-header">Age &amp; Usage</h3>
+                    <div class="metrics-grid">
+                        <template for:each={metrics} for:item="metric">
+                            <div key={metric.key} class="metric-card" title={metric.description}>
+                                <div class="metric-icon">
+                                    <lightning-icon icon-name={metric.icon} size="xx-small"></lightning-icon>
+                                </div>
+                                <div class="metric-info">
+                                    <span class="metric-label">{metric.label}</span>
+                                    <span class="metric-value">{metric.value}</span>
+                                </div>
                             </div>
-                            <div class="prediction-confidence">
-                                <span class="confidence-label">Confidence:</span>
-                                <span class="confidence-value">{predictionConfidence}%</span>
-                            </div>
-                        </div>
+                        </template>
                     </div>
                 </div>
 

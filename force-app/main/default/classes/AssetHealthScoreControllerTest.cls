@@ -79,11 +79,14 @@ private class AssetHealthScoreControllerTest {
                 'Trend score should be 0-100, got: ' + tp.score);
         }
 
-        // Prediction
-        System.assertNotEquals(null, result.prediction, 'Prediction should not be null');
-        System.assert(result.prediction.daysUntilFailure > 0, 'Days should be positive');
-        System.assert(result.prediction.confidence > 0 && result.prediction.confidence <= 100,
-            'Confidence should be 1-100');
+        // Metrics
+        System.assertNotEquals(null, result.metrics, 'Metrics should not be null');
+        System.assertEquals(6, result.metrics.size(), 'Should have 6 metrics');
+        for (AssetHealthScoreController.AssetMetric m : result.metrics) {
+            System.assertNotEquals(null, m.label, 'Metric label should be set');
+            System.assertNotEquals(null, m.value, 'Metric value should be set');
+            System.assertNotEquals(null, m.icon, 'Metric icon should be set');
+        }
 
         // Recommendation
         System.assertNotEquals(null, result.recommendation, 'Recommendation should not be null');
@@ -191,7 +194,7 @@ private class AssetHealthScoreControllerTest {
     }
 
     @IsTest
-    static void testPredictionSeverityValues() {
+    static void testMetricsContent() {
         Asset a = getAnyAsset();
 
         Test.startTest();
@@ -199,11 +202,14 @@ private class AssetHealthScoreControllerTest {
             AssetHealthScoreController.getHealthScore(a.Id);
         Test.stopTest();
 
-        System.assert(
-            result.prediction.severity == 'critical' ||
-            result.prediction.severity == 'warning' ||
-            result.prediction.severity == 'healthy',
-            'Severity should be valid, got: ' + result.prediction.severity
-        );
+        // Verify specific metric labels exist
+        Set<String> expectedLabels = new Set<String>{
+            'Age', 'Days Since Installation', 'Total Usage',
+            'Hours', 'Repairs', 'Repairs in Last 6 Months'
+        };
+        for (AssetHealthScoreController.AssetMetric m : result.metrics) {
+            System.assert(expectedLabels.contains(m.label),
+                'Unexpected metric label: ' + m.label);
+        }
     }
 }

@@ -252,30 +252,14 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         return `trend-indicator trend-indicator--${this.trendDirection}`;
     }
 
-    // ─── Prediction ────────────────────────────────────────────────
+    // ─── Metrics ──────────────────────────────────────────────────
 
-    get prediction() {
-        return this.healthData?.prediction;
-    }
-
-    get predictionClass() {
-        const severity = this.prediction?.severity ?? 'healthy';
-        return `prediction-card prediction-card--${severity}`;
-    }
-
-    get predictionIcon() {
-        const severity = this.prediction?.severity ?? 'healthy';
-        if (severity === 'critical') return 'utility:warning';
-        if (severity === 'warning') return 'utility:clock';
-        return 'utility:check';
-    }
-
-    get predictionDays() {
-        return this.prediction?.daysUntilFailure ?? '—';
-    }
-
-    get predictionConfidence() {
-        return this.prediction?.confidence ?? 0;
+    get metrics() {
+        if (!this.healthData?.metrics) return [];
+        return this.healthData.metrics.map((m, idx) => ({
+            ...m,
+            key: `metric-${idx}`
+        }));
     }
 
     // ─── Recommendation ────────────────────────────────────────────

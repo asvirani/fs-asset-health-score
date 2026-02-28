@@ -46,7 +46,7 @@ public with sharing class AssetHealthScoreController {
         result.scoreLabel = getScoreLabel(compositeScore);
         result.factors = buildFactors(woScore, warrantyScore, caseScore, assetId, asset);
         result.trendData = generateTrendData(assetId, compositeScore);
-        result.prediction = generatePrediction(compositeScore, assetId);
+        result.metrics = buildAssetMetrics(asset, assetId);
         result.recommendation = generateRecommendation(compositeScore, result.factors, asset);
         result.lastCalculated = Datetime.now();
         result.assetName = asset.Name;
@@ -390,58 +390,127 @@ public with sharing class AssetHealthScoreController {
         return months[d.month() - 1];
     }
 
-    // ─── Predicted Failure ─────────────────────────────────────────────
+    // ─── Asset Metrics (Age & Usage) ───────────────────────────────────
 
-    private static PredictionResult generatePrediction(Decimal currentScore, Id assetId) {
-        PredictionResult pred = new PredictionResult();
+    private static List<AssetMetric> buildAssetMetrics(Asset asset, Id assetId) {
+        List<AssetMetric> metrics = new List<AssetMetric>();
+        Date today = Date.today();
+        Date sixMonthsAgo = today.addMonths(-6);
 
-        // Find similar assets (same Product2) to calibrate prediction
-        Asset thisAsset = [SELECT Product2Id, InstallDate FROM Asset WHERE Id = :assetId LIMIT 1];
-
-        Integer similarAssetFailures = 0;
-        Decimal avgScoreAtFailure = 40;
-
-        if (thisAsset.Product2Id != null) {
-            // Count WOs flagged as failures on similar assets
-            similarAssetFailures = [
-                SELECT COUNT() FROM WorkOrder
-                WHERE Asset.Product2Id = :thisAsset.Product2Id
-                AND (Priority = 'Critical' OR Priority = 'High')
-                AND Subject LIKE '%fail%'
-            ];
+        // 1. Age — time since installation
+        Integer daysSinceInstall = 0;
+        String ageDisplay = '—';
+        if (asset.InstallDate != null) {
+            daysSinceInstall = asset.InstallDate.daysBetween(today);
+            if (daysSinceInstall >= 365) {
+                Decimal years = ((Decimal) daysSinceInstall / 365).setScale(1, RoundingMode.HALF_UP);
+                ageDisplay = years + ' yr' + (years != 1.0 ? 's' : '');
+            } else if (daysSinceInstall >= 30) {
+                Integer months = daysSinceInstall / 30;
+                ageDisplay = months + ' mo' + (months != 1 ? 's' : '');
+            } else {
+                ageDisplay = daysSinceInstall + ' day' + (daysSinceInstall != 1 ? 's' : '');
+            }
         }
+        metrics.add(createMetric(
+            'Age',
+            ageDisplay,
+            'Time since initial installation',
+            'utility:date_time'
+        ));
 
-        // Prediction model: lower score = sooner failure
-        if (currentScore >= 80) {
-            pred.daysUntilFailure = 365 + Integer.valueOf(Math.mod(Math.abs(assetId.hashCode()), 180));
-            pred.confidence = 45;
-        } else if (currentScore >= 60) {
-            pred.daysUntilFailure = 120 + Integer.valueOf(Math.mod(Math.abs(assetId.hashCode()), 90));
-            pred.confidence = 62;
-        } else if (currentScore >= 40) {
-            pred.daysUntilFailure = 30 + Integer.valueOf(Math.mod(Math.abs(assetId.hashCode()), 60));
-            pred.confidence = 78;
-        } else {
-            pred.daysUntilFailure = 7 + Integer.valueOf(Math.mod(Math.abs(assetId.hashCode()), 23));
-            pred.confidence = 89;
+        // 2. Days Since Installation
+        metrics.add(createMetric(
+            'Days Since Installation',
+            asset.InstallDate != null ? String.valueOf(daysSinceInstall) : '—',
+            'Total days since asset was installed',
+            'utility:calendar'
+        ));
+
+        // 3. Total Usage
+        String usageDisplay = '—';
+        if (asset.TotalUsage__c != null) {
+            usageDisplay = formatNumber(asset.TotalUsage__c);
+            if (String.isNotBlank(asset.TotalUsageUOM__c)) {
+                usageDisplay += ' ' + asset.TotalUsageUOM__c;
+            }
         }
+        metrics.add(createMetric(
+            'Total Usage',
+            usageDisplay,
+            'Cumulative asset usage since put into service',
+            'utility:metrics'
+        ));
 
-        // Adjust confidence if we have similar asset data
-        if (similarAssetFailures > 3) {
-            pred.confidence = Math.min(95, pred.confidence + 10);
+        // 4. Hours (cumulative uptime)
+        String hoursDisplay = '—';
+        if (asset.AverageUptimePerDay != null && asset.InstallDate != null) {
+            Decimal totalHours = (asset.AverageUptimePerDay * daysSinceInstall).setScale(0, RoundingMode.HALF_UP);
+            hoursDisplay = formatNumber(totalHours) + ' hrs';
+        } else if (daysSinceInstall > 0) {
+            // Estimate 16 hrs/day operational for demo purposes
+            Decimal estimatedHours = daysSinceInstall * 16;
+            hoursDisplay = '~' + formatNumber(estimatedHours) + ' hrs';
         }
+        metrics.add(createMetric(
+            'Hours',
+            hoursDisplay,
+            'Cumulative operating hours since installation',
+            'utility:clock'
+        ));
 
-        // Severity
-        if (pred.daysUntilFailure < 30) {
-            pred.severity = 'critical';
-        } else if (pred.daysUntilFailure < 90) {
-            pred.severity = 'warning';
-        } else {
-            pred.severity = 'healthy';
+        // 5. Repairs — total repair-type work orders
+        Integer totalRepairs = [
+            SELECT COUNT() FROM WorkOrder
+            WHERE AssetId = :assetId
+            AND (Subject LIKE '%Repair%' OR Subject LIKE '%Break-Fix%'
+                 OR Subject LIKE '%Corrective%' OR Subject LIKE '%Rebuild%'
+                 OR Subject LIKE '%Maintenance%' OR Subject LIKE '%Replace%')
+        ];
+        metrics.add(createMetric(
+            'Repairs',
+            String.valueOf(totalRepairs),
+            'Total repair work orders for this asset',
+            'utility:maintenance'
+        ));
+
+        // 6. Repairs in Last 6 Months
+        Datetime sixMonthsDt = Datetime.newInstance(sixMonthsAgo, Time.newInstance(0,0,0,0));
+        Integer recentRepairs = [
+            SELECT COUNT() FROM WorkOrder
+            WHERE AssetId = :assetId
+            AND CreatedDate >= :sixMonthsDt
+            AND (Subject LIKE '%Repair%' OR Subject LIKE '%Break-Fix%'
+                 OR Subject LIKE '%Corrective%' OR Subject LIKE '%Rebuild%'
+                 OR Subject LIKE '%Maintenance%' OR Subject LIKE '%Replace%')
+        ];
+        metrics.add(createMetric(
+            'Repairs in Last 6 Months',
+            String.valueOf(recentRepairs),
+            'Recent repair activity — higher counts may indicate declining performance',
+            'utility:warning'
+        ));
+
+        return metrics;
+    }
+
+    private static AssetMetric createMetric(String label, String value, String description, String icon) {
+        AssetMetric m = new AssetMetric();
+        m.label = label;
+        m.value = value;
+        m.description = description;
+        m.icon = icon;
+        return m;
+    }
+
+    private static String formatNumber(Decimal num) {
+        if (num == null) return '—';
+        if (num >= 1000000) {
+            return (num / 1000000).setScale(1, RoundingMode.HALF_UP) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).setScale(1, RoundingMode.HALF_UP) + 'K';
         }
-
-        pred.similarAssetCount = similarAssetFailures;
-        return pred;
+        return String.valueOf(num.intValue());
     }
 
     // ─── Recommendation Engine ─────────────────────────────────────────
@@ -504,6 +573,7 @@ public with sharing class AssetHealthScoreController {
             SELECT Id, Name, Status, InstallDate, Product2Id,
                    Entitlement_Status__c, Reliability, Availability,
                    MeanTimeBetweenFailures, MeanTimeToRepair,
+                   AverageUptimePerDay, TotalUsage__c, TotalUsageUOM__c,
                    SDO_Service_Perform_Status__c
             FROM Asset
             WHERE Id = :assetId
@@ -532,7 +602,7 @@ public with sharing class AssetHealthScoreController {
         @AuraEnabled public String scoreLabel;
         @AuraEnabled public List<FactorDetail> factors;
         @AuraEnabled public List<TrendPoint> trendData;
-        @AuraEnabled public PredictionResult prediction;
+        @AuraEnabled public List<AssetMetric> metrics;
         @AuraEnabled public RecommendationResult recommendation;
         @AuraEnabled public Datetime lastCalculated;
         @AuraEnabled public String assetName;
@@ -552,11 +622,11 @@ public with sharing class AssetHealthScoreController {
         @AuraEnabled public Integer score;
     }
 
-    public class PredictionResult {
-        @AuraEnabled public Integer daysUntilFailure;
-        @AuraEnabled public Integer confidence;
-        @AuraEnabled public String severity;
-        @AuraEnabled public Integer similarAssetCount;
+    public class AssetMetric {
+        @AuraEnabled public String label;
+        @AuraEnabled public String value;
+        @AuraEnabled public String description;
+        @AuraEnabled public String icon;
     }
 
     public class RecommendationResult {
