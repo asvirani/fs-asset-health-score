@@ -1,0 +1,231 @@
+<template>
+    <lightning-card>
+        <!-- Loading State -->
+        <template lwc:if={isLoading}>
+            <div class="loading-container">
+                <lightning-spinner alternative-text="Calculating health score..." size="medium"></lightning-spinner>
+                <p class="loading-text">Calculating Asset Health Score...</p>
+            </div>
+        </template>
+
+        <!-- Error State -->
+        <template lwc:if={error}>
+            <div class="error-container">
+                <lightning-icon icon-name="utility:error" size="small" variant="error"></lightning-icon>
+                <p class="error-text">{error}</p>
+            </div>
+        </template>
+
+        <!-- Main Content -->
+        <template lwc:if={hasData}>
+            <div class="health-score-container">
+
+                <!-- ═══ GAUGE SECTION ═══ -->
+                <div class="gauge-section">
+                    <h2 class="section-header">Asset Health Score</h2>
+                    <div class="gauge-wrapper">
+                        <svg viewBox="0 0 300 175" class="gauge-svg" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
+                                    <stop offset="35%" style="stop-color:#f97316;stop-opacity:1" />
+                                    <stop offset="50%" style="stop-color:#eab308;stop-opacity:1" />
+                                    <stop offset="75%" style="stop-color:#22c55e;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+                                </linearGradient>
+                                <filter id="gaugeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feGaussianBlur stdDeviation="4" result="blur" />
+                                    <feMerge>
+                                        <feMergeNode in="blur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                    </feMerge>
+                                </filter>
+                            </defs>
+
+                            <!-- Track -->
+                            <path
+                                d={gaugeArcPath}
+                                fill="none"
+                                stroke={gaugeTrackColor}
+                                stroke-width={gaugeStrokeWidth}
+                                stroke-linecap="round"
+                            />
+
+                            <!-- Filled Arc -->
+                            <path
+                                d={gaugeArcPath}
+                                fill="none"
+                                stroke={gaugeGradientUrl}
+                                stroke-width={gaugeStrokeWidth}
+                                stroke-linecap="round"
+                                stroke-dasharray={gaugeDashArray}
+                                filter={gaugeGlowFilter}
+                                class="gauge-fill"
+                            />
+
+                            <!-- Score Text -->
+                            <text
+                                x={scoreDisplayX}
+                                y={scoreDisplayY}
+                                text-anchor="middle"
+                                class="gauge-score-text"
+                                fill={scoreColor}
+                            >
+                                {animatedScore}
+                            </text>
+
+                            <!-- Label -->
+                            <text
+                                x={scoreDisplayX}
+                                y={scoreLabelY}
+                                text-anchor="middle"
+                                class="gauge-label-text"
+                                fill={scoreColor}
+                            >
+                                {scoreLabel}
+                            </text>
+
+                            <!-- Min/Max Labels -->
+                            <text x="22" y="148" class="gauge-range-text">0</text>
+                            <text x="270" y="148" class="gauge-range-text">100</text>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- ═══ FACTORS SECTION ═══ -->
+                <div class="factors-section">
+                    <h3 class="subsection-header">Contributing Factors</h3>
+                    <template for:each={factors} for:item="factor">
+                        <div key={factor.key} class="factor-row">
+                            <div class="factor-header" data-key={factor.key} onclick={handleFactorToggle}>
+                                <div class="factor-left">
+                                    <lightning-icon
+                                        icon-name={factor.expandIcon}
+                                        size="xx-small"
+                                        class="factor-chevron"
+                                    ></lightning-icon>
+                                    <lightning-icon
+                                        icon-name={factor.statusIcon}
+                                        size="xx-small"
+                                        class={factor.statusClass}
+                                    ></lightning-icon>
+                                    <span class="factor-name">{factor.name}</span>
+                                    <span class="factor-weight">({factor.weightLabel})</span>
+                                </div>
+                                <div class="factor-right">
+                                    <span class="factor-score">{factor.score}</span>
+                                    <span class="factor-score-max">/100</span>
+                                </div>
+                            </div>
+                            <div class="factor-bar-track">
+                                <div class={factor.barClass} style={factor.barWidth}></div>
+                            </div>
+                            <template lwc:if={factor.isExpanded}>
+                                <div class="factor-detail">
+                                    <p>{factor.detail}</p>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ═══ TREND SPARKLINE ═══ -->
+                <div class="trend-section">
+                    <div class="trend-header">
+                        <h3 class="subsection-header">6-Month Trend</h3>
+                        <span class={trendClass}>{trendLabel}</span>
+                    </div>
+                    <div class="sparkline-wrapper">
+                        <svg viewBox="0 0 280 72" class="sparkline-svg" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="sparklineGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.3" />
+                                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.02" />
+                                </linearGradient>
+                            </defs>
+                            <!-- Area fill -->
+                            <polygon
+                                points={sparklineAreaPoints}
+                                fill={sparklineGradientUrl}
+                            />
+                            <!-- Line -->
+                            <polyline
+                                points={sparklinePoints}
+                                fill="none"
+                                stroke="#3b82f6"
+                                stroke-width="2"
+                                stroke-linejoin="round"
+                                stroke-linecap="round"
+                            />
+                            <!-- Dots and Labels -->
+                            <template for:each={sparklineDots} for:item="dot">
+                                <circle
+                                    key={dot.key}
+                                    cx={dot.cx}
+                                    cy={dot.cy}
+                                    r="3"
+                                    fill="#3b82f6"
+                                    stroke="white"
+                                    stroke-width="1.5"
+                                />
+                                <text
+                                    key={dot.label}
+                                    x={dot.labelX}
+                                    y={dot.labelY}
+                                    text-anchor="middle"
+                                    class="sparkline-label"
+                                >
+                                    {dot.label}
+                                </text>
+                            </template>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- ═══ PREDICTED FAILURE ═══ -->
+                <div class={predictionClass}>
+                    <div class="prediction-content">
+                        <div class="prediction-icon">
+                            <lightning-icon icon-name={predictionIcon} size="small"></lightning-icon>
+                        </div>
+                        <div class="prediction-info">
+                            <div class="prediction-main">
+                                <span class="prediction-label">Estimated failure in</span>
+                                <span class="prediction-days">{predictionDays} days</span>
+                            </div>
+                            <div class="prediction-confidence">
+                                <span class="confidence-label">Confidence:</span>
+                                <span class="confidence-value">{predictionConfidence}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ RECOMMENDATION ═══ -->
+                <div class={recommendationClass}>
+                    <div class="recommendation-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="ai-icon">
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                        </svg>
+                        <span>Agentforce Recommendation</span>
+                    </div>
+                    <h4 class="recommendation-title">{recommendation.title}</h4>
+                    <p class="recommendation-desc">{recommendation.description}</p>
+                    <div class="recommendation-action">
+                        <lightning-button
+                            label={recommendation.actionLabel}
+                            variant={recommendationButtonVariant}
+                            onclick={handleCreateWorkOrder}
+                            icon-name="utility:new"
+                        ></lightning-button>
+                    </div>
+                </div>
+
+                <!-- ═══ FOOTER ═══ -->
+                <div class="footer">
+                    <span class="last-calculated">Last calculated: {lastCalculated}</span>
+                </div>
+            </div>
+        </template>
+    </lightning-card>
+</template>
