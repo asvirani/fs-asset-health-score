@@ -573,8 +573,7 @@ public with sharing class AssetHealthScoreController {
             SELECT Id, Name, Status, InstallDate, Product2Id,
                    Entitlement_Status__c, Reliability, Availability,
                    MeanTimeBetweenFailures, MeanTimeToRepair,
-                   AverageUptimePerDay, TotalUsage__c, TotalUsageUOM__c,
-                   SDO_Service_Perform_Status__c
+                   AverageUptimePerDay, TotalUsage__c, TotalUsageUOM__c
             FROM Asset
             WHERE Id = :assetId
             LIMIT 1

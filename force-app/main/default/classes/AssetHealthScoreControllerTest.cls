@@ -1,53 +1,75 @@
-@IsTest(SeeAllData=true)
+@IsTest
 private class AssetHealthScoreControllerTest {
 
-    // Uses existing org data — this package targets internal demo orgs
-    // with pre-populated Assets, Work Orders, Cases, and Warranties.
+    @TestSetup
+    static void setupTestData() {
+        Account acc = new Account(Name = 'Test Account');
+        insert acc;
 
-    private static Asset getAssetWithWorkOrders() {
-        List<Asset> assets = [
-            SELECT Id, Name, Entitlement_Status__c
-            FROM Asset
-            WHERE Id IN (SELECT AssetId FROM WorkOrder WHERE AssetId != null)
-            AND Status = 'Installed'
-            LIMIT 1
-        ];
-        return assets.isEmpty() ? null : assets[0];
-    }
+        Product2 prod = new Product2(Name = 'Test Turbine', ProductCode = 'TURB-001', IsActive = true);
+        insert prod;
 
-    private static Asset getAssetWithoutWorkOrders() {
-        List<Asset> assets = [
-            SELECT Id, Name, Entitlement_Status__c
-            FROM Asset
-            WHERE Id NOT IN (SELECT AssetId FROM WorkOrder WHERE AssetId != null)
-            AND Id NOT IN (SELECT AssetId FROM Case WHERE AssetId != null)
-            AND Status = 'Installed'
-            LIMIT 1
-        ];
-        return assets.isEmpty() ? null : assets[0];
-    }
+        // Asset with related data
+        Asset fullAsset = new Asset(
+            Name = 'Test Turbine Alpha',
+            AccountId = acc.Id,
+            Product2Id = prod.Id,
+            Status = 'Installed',
+            InstallDate = Date.today().addDays(-365),
+            Entitlement_Status__c = 'Active'
+        );
+        insert fullAsset;
 
-    private static Asset getExpiredWarrantyAsset() {
-        List<Asset> assets = [
-            SELECT Id, Name, Entitlement_Status__c
-            FROM Asset
-            WHERE Entitlement_Status__c = 'Expired'
-            AND Status = 'Installed'
-            LIMIT 1
-        ];
-        return assets.isEmpty() ? null : assets[0];
-    }
+        // Asset with no related records
+        Asset cleanAsset = new Asset(
+            Name = 'Test Turbine Clean',
+            AccountId = acc.Id,
+            Product2Id = prod.Id,
+            Status = 'Installed',
+            InstallDate = Date.today().addDays(-30)
+        );
+        insert cleanAsset;
 
-    private static Asset getAnyAsset() {
-        return [SELECT Id, Name FROM Asset WHERE Status = 'Installed' LIMIT 1];
+        // Asset with expired warranty
+        Asset expiredAsset = new Asset(
+            Name = 'Test Turbine Expired',
+            AccountId = acc.Id,
+            Status = 'Installed',
+            InstallDate = Date.today().addDays(-730),
+            Entitlement_Status__c = 'Expired'
+        );
+        insert expiredAsset;
+
+        // Cases for fullAsset
+        List<Case> cases = new List<Case>();
+        cases.add(new Case(
+            AssetId = fullAsset.Id,
+            Subject = 'Overheating reported',
+            Status = 'New',
+            Priority = 'High',
+            Origin = 'Phone'
+        ));
+        cases.add(new Case(
+            AssetId = fullAsset.Id,
+            Subject = 'Noise complaint',
+            Status = 'Closed',
+            Priority = 'Medium',
+            Origin = 'Email'
+        ));
+        cases.add(new Case(
+            AssetId = fullAsset.Id,
+            Subject = 'Escalated vibration issue',
+            Status = 'New',
+            Priority = 'Critical',
+            IsEscalated = true,
+            Origin = 'Web'
+        ));
+        insert cases;
     }
 
     @IsTest
-    static void testGetHealthScore_AssetWithWorkOrders() {
-        Asset a = getAssetWithWorkOrders();
-        if (a == null) {
-            a = getAnyAsset();
-        }
+    static void testGetHealthScore_FullAsset() {
+        Asset a = [SELECT Id FROM Asset WHERE Name = 'Test Turbine Alpha' LIMIT 1];
 
         Test.startTest();
         AssetHealthScoreController.HealthScoreResult result =
@@ -58,7 +80,7 @@ private class AssetHealthScoreControllerTest {
         System.assert(result.overallScore >= 0 && result.overallScore <= 100,
             'Score should be 0-100, got: ' + result.overallScore);
         System.assertNotEquals(null, result.scoreLabel, 'Score label should be set');
-        System.assertNotEquals(null, result.assetName, 'Asset name should be set');
+        System.assertEquals('Test Turbine Alpha', result.assetName, 'Asset name should match');
         System.assertNotEquals(null, result.lastCalculated, 'Last calculated should be set');
 
         // Factors
@@ -93,15 +115,12 @@ private class AssetHealthScoreControllerTest {
         System.assertNotEquals(null, result.recommendation.title, 'Title should be set');
         System.assertNotEquals(null, result.recommendation.description, 'Description should be set');
         System.assertNotEquals(null, result.recommendation.actionLabel, 'Action label should be set');
+        System.assertEquals(a.Id, result.recommendation.assetId, 'Asset ID should match');
     }
 
     @IsTest
     static void testGetHealthScore_CleanAsset() {
-        Asset a = getAssetWithoutWorkOrders();
-        if (a == null) {
-            // Fallback: just use any asset
-            a = getAnyAsset();
-        }
+        Asset a = [SELECT Id FROM Asset WHERE Name = 'Test Turbine Clean' LIMIT 1];
 
         Test.startTest();
         AssetHealthScoreController.HealthScoreResult result =
@@ -109,16 +128,13 @@ private class AssetHealthScoreControllerTest {
         Test.stopTest();
 
         System.assertNotEquals(null, result, 'Result should not be null');
-        System.assert(result.overallScore >= 0 && result.overallScore <= 100,
-            'Score should be valid, got: ' + result.overallScore);
+        System.assert(result.overallScore >= 50,
+            'Clean asset should score well, got: ' + result.overallScore);
     }
 
     @IsTest
     static void testGetHealthScore_ExpiredWarranty() {
-        Asset a = getExpiredWarrantyAsset();
-        if (a == null) {
-            a = getAnyAsset();
-        }
+        Asset a = [SELECT Id, Entitlement_Status__c FROM Asset WHERE Name = 'Test Turbine Expired' LIMIT 1];
 
         Test.startTest();
         AssetHealthScoreController.HealthScoreResult result =
@@ -126,7 +142,6 @@ private class AssetHealthScoreControllerTest {
         Test.stopTest();
 
         System.assertNotEquals(null, result, 'Result should not be null');
-
         AssetHealthScoreController.FactorDetail warrantyFactor;
         for (AssetHealthScoreController.FactorDetail f : result.factors) {
             if (f.name == 'Warranty Status') {
@@ -135,16 +150,13 @@ private class AssetHealthScoreControllerTest {
             }
         }
         System.assertNotEquals(null, warrantyFactor, 'Warranty factor should exist');
-        // If we got an actual expired asset, verify low score
-        if (a.Entitlement_Status__c == 'Expired') {
-            System.assert(warrantyFactor.score <= 50,
-                'Expired warranty should score low, got: ' + warrantyFactor.score);
-        }
+        System.assert(warrantyFactor.score <= 50,
+            'Expired warranty should score low, got: ' + warrantyFactor.score);
     }
 
     @IsTest
     static void testScoreLabels() {
-        Asset a = getAnyAsset();
+        Asset a = [SELECT Id FROM Asset WHERE Name = 'Test Turbine Clean' LIMIT 1];
 
         Test.startTest();
         AssetHealthScoreController.HealthScoreResult result =
@@ -161,7 +173,7 @@ private class AssetHealthScoreControllerTest {
 
     @IsTest
     static void testTrendDataCompleteness() {
-        Asset a = getAnyAsset();
+        Asset a = [SELECT Id FROM Asset WHERE Name = 'Test Turbine Alpha' LIMIT 1];
 
         Test.startTest();
         AssetHealthScoreController.HealthScoreResult result =
@@ -170,8 +182,6 @@ private class AssetHealthScoreControllerTest {
 
         List<AssetHealthScoreController.TrendPoint> trend = result.trendData;
         System.assertEquals(6, trend.size(), 'Should have 6 trend points');
-
-        // Last trend point should match current score
         AssetHealthScoreController.TrendPoint lastPoint = trend[trend.size() - 1];
         System.assertEquals(result.overallScore, lastPoint.score,
             'Last trend point should match current score');
@@ -179,7 +189,7 @@ private class AssetHealthScoreControllerTest {
 
     @IsTest
     static void testFactorWeightsAddUp() {
-        Asset a = getAnyAsset();
+        Asset a = [SELECT Id FROM Asset WHERE Name = 'Test Turbine Alpha' LIMIT 1];
 
         Test.startTest();
         AssetHealthScoreController.HealthScoreResult result =
@@ -195,14 +205,13 @@ private class AssetHealthScoreControllerTest {
 
     @IsTest
     static void testMetricsContent() {
-        Asset a = getAnyAsset();
+        Asset a = [SELECT Id FROM Asset WHERE Name = 'Test Turbine Alpha' LIMIT 1];
 
         Test.startTest();
         AssetHealthScoreController.HealthScoreResult result =
             AssetHealthScoreController.getHealthScore(a.Id);
         Test.stopTest();
 
-        // Verify specific metric labels exist
         Set<String> expectedLabels = new Set<String>{
             'Age', 'Days Since Installation', 'Total Usage',
             'Hours', 'Repairs', 'Repairs in Last 6 Months'
@@ -211,5 +220,16 @@ private class AssetHealthScoreControllerTest {
             System.assert(expectedLabels.contains(m.label),
                 'Unexpected metric label: ' + m.label);
         }
+    }
+
+    @IsTest
+    static void testResolveAssetId_Asset() {
+        Asset a = [SELECT Id FROM Asset WHERE Name = 'Test Turbine Alpha' LIMIT 1];
+
+        Test.startTest();
+        Id resolved = AssetHealthScoreController.resolveAssetId(a.Id);
+        Test.stopTest();
+
+        System.assertEquals(a.Id, resolved, 'Should return same Asset Id');
     }
 }

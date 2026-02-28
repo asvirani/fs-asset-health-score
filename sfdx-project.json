@@ -1,12 +1,20 @@
 {
   "packageDirectories": [
     {
+      "versionName": "v1.0",
+      "versionNumber": "1.0.0.NEXT",
       "path": "force-app",
-      "default": true
+      "default": true,
+      "package": "Enhanced Asset Health Score",
+      "versionDescription": "Dynamic health score gauge with contributing factors, age & usage metrics, trend sparkline, and Agentforce recommendation card for Field Service assets."
     }
   ],
   "name": "fs-asset-health-score",
   "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
-  "sourceApiVersion": "62.0"
+  "sourceApiVersion": "62.0",
+  "packageAliases": {
+    "Enhanced Asset Health Score": "0HoKa000000sgNHKAY",
+    "Enhanced Asset Health Score@1.0.0-1": "04tKa000002znWHIAY"
+  }
 }

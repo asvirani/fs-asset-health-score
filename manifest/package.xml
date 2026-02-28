@@ -6,6 +6,12 @@
         <name>ApexClass</name>
     </types>
     <types>
+        <members>Asset.Entitlement_Status__c</members>
+        <members>Asset.TotalUsage__c</members>
+        <members>Asset.TotalUsageUOM__c</members>
+        <name>CustomField</name>
+    </types>
+    <types>
         <members>sfs_assetHealthScore</members>
         <name>LightningComponentBundle</name>
     </types>
