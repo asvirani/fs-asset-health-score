@@ -20,29 +20,32 @@
         <template lwc:if={hasData}>
             <div class="health-score-container">
 
-                <!-- ═══ GAUGE SECTION ═══ -->
+                <!-- GAUGE SECTION — Clean Light -->
                 <div class="gauge-section">
-                    <h2 class="section-header">Enhanced Asset Health Score</h2>
+                    <div class="gauge-header">
+                        <span class="asset-name">{assetName}</span>
+                        <h2 class="section-header">Health Score</h2>
+                    </div>
                     <div class="gauge-wrapper">
                         <svg viewBox="0 0 300 175" class="gauge-svg" xmlns="http://www.w3.org/2000/svg">
 
-                            <!-- Track -->
+                            <!-- Track — SLDS gray -->
                             <path
                                 d={gaugeArcPath}
                                 fill="none"
-                                stroke="#e5e7eb"
-                                stroke-width="16"
+                                stroke="#c9c7c5"
+                                stroke-width="14"
                                 stroke-linecap="round"
                             />
 
-                            <!-- Filled Arc — uses inline style for dasharray (LWC shadow DOM safe) -->
+                            <!-- Filled Arc -->
                             <path
                                 d={gaugeArcPath}
                                 fill="none"
                                 stroke={scoreColor}
-                                stroke-width="16"
+                                stroke-width="14"
                                 stroke-linecap="round"
-                                style={gaugeArcStyle}
+                                style={gaugeArcStyleClean}
                                 class="gauge-fill"
                             />
 
@@ -75,132 +78,169 @@
                     </div>
                 </div>
 
-                <!-- ═══ FACTORS SECTION ═══ -->
-                <div class="factors-section">
-                    <h3 class="subsection-header">Contributing Factors</h3>
-                    <template for:each={factors} for:item="factor">
-                        <div key={factor.key} class="factor-row">
-                            <div class="factor-header" data-key={factor.key} onclick={handleFactorToggle}>
-                                <div class="factor-left">
-                                    <lightning-icon
-                                        icon-name={factor.expandIcon}
-                                        size="xx-small"
-                                        class="factor-chevron"
-                                    ></lightning-icon>
-                                    <lightning-icon
-                                        icon-name={factor.statusIcon}
-                                        size="xx-small"
-                                        class={factor.statusClass}
-                                    ></lightning-icon>
-                                    <span class="factor-name">{factor.name}</span>
-                                    <span class="factor-weight">({factor.weightLabel})</span>
-                                </div>
-                                <div class="factor-right">
-                                    <span class="factor-score">{factor.score}</span>
-                                    <span class="factor-score-max">/100</span>
-                                </div>
-                            </div>
-                            <div class="factor-bar-track">
-                                <div class={factor.barClass} style={factor.barWidth}></div>
-                            </div>
-                            <template lwc:if={factor.isExpanded}>
-                                <div class="factor-detail">
-                                    <p>{factor.detail}</p>
+                <!-- DETAILS TOGGLE -->
+                <div class="details-toggle" onclick={handleDetailsToggle} role="button" tabindex="0">
+                    <span class="details-toggle-text">{detailsToggleLabel}</span>
+                    <lightning-icon
+                        icon-name="utility:chevrondown"
+                        size="xx-small"
+                        class={detailsToggleIconClass}
+                    ></lightning-icon>
+                </div>
+
+                <!-- COLLAPSIBLE DETAILS -->
+                <template lwc:if={isDetailsExpanded}>
+                    <div class="content-body">
+
+                        <!-- FACTORS SECTION -->
+                        <div class="factors-section">
+                            <h3 class="subsection-header">Contributing Factors</h3>
+                            <template for:each={factors} for:item="factor">
+                                <div key={factor.key} class="factor-row">
+                                    <div class="factor-header" data-key={factor.key} onclick={handleFactorToggle}>
+                                        <div class="factor-left">
+                                            <lightning-icon
+                                                icon-name={factor.expandIcon}
+                                                size="xx-small"
+                                                class="factor-chevron"
+                                            ></lightning-icon>
+                                            <lightning-icon
+                                                icon-name={factor.statusIcon}
+                                                size="xx-small"
+                                                class={factor.statusClass}
+                                            ></lightning-icon>
+                                            <span class="factor-name">{factor.name}</span>
+                                            <span class="factor-weight">({factor.weightLabel})</span>
+                                        </div>
+                                        <div class="factor-right">
+                                            <span class={factor.scoreClass}>{factor.score}</span>
+                                            <span class="factor-score-max">/100</span>
+                                        </div>
+                                    </div>
+                                    <div class="factor-bar-track">
+                                        <div class={factor.barClass} style={factor.barWidth}></div>
+                                    </div>
+                                    <template lwc:if={factor.isExpanded}>
+                                        <div class="factor-detail">
+                                            <p>{factor.detail}</p>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </div>
-                    </template>
-                </div>
 
-                <!-- ═══ TREND SPARKLINE ═══ -->
-                <div class="trend-section">
-                    <div class="trend-header">
-                        <h3 class="subsection-header">6-Month Trend</h3>
-                        <span class={trendClass}>{trendLabel}</span>
-                    </div>
-                    <div class="sparkline-wrapper">
-                        <svg viewBox="0 0 280 72" class="sparkline-svg" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Area fill — solid color since url() breaks in shadow DOM -->
-                            <polygon
-                                points={sparklineAreaPoints}
-                                fill="rgba(59, 130, 246, 0.12)"
-                            />
-                            <!-- Line -->
-                            <polyline
-                                points={sparklinePoints}
-                                fill="none"
-                                stroke="#3b82f6"
-                                stroke-width="2"
-                                stroke-linejoin="round"
-                                stroke-linecap="round"
-                            />
-                            <!-- Dots and Labels -->
-                            <template for:each={sparklineDots} for:item="dot">
-                                <circle
-                                    key={dot.key}
-                                    cx={dot.cx}
-                                    cy={dot.cy}
-                                    r="3"
-                                    fill="#3b82f6"
-                                    stroke="white"
-                                    stroke-width="1.5"
-                                />
-                                <text
-                                    key={dot.label}
-                                    x={dot.labelX}
-                                    y={dot.labelY}
-                                    text-anchor="middle"
-                                    class="sparkline-label"
-                                >
-                                    {dot.label}
-                                </text>
-                            </template>
-                        </svg>
-                    </div>
-                </div>
-
-                <!-- ═══ AGE & USAGE METRICS ═══ -->
-                <div class="metrics-section">
-                    <h3 class="subsection-header">Age &amp; Usage</h3>
-                    <div class="metrics-grid">
-                        <template for:each={metrics} for:item="metric">
-                            <div key={metric.key} class="metric-card" title={metric.description}>
-                                <div class="metric-icon">
-                                    <lightning-icon icon-name={metric.icon} size="xx-small"></lightning-icon>
-                                </div>
-                                <div class="metric-info">
-                                    <span class="metric-label">{metric.label}</span>
-                                    <span class="metric-value">{metric.value}</span>
-                                </div>
+                        <!-- TREND SPARKLINE -->
+                        <div class="trend-section">
+                            <div class="trend-header">
+                                <h3 class="subsection-header">6-Month Trend</h3>
+                                <span class={trendClass}>{trendLabel}</span>
                             </div>
-                        </template>
-                    </div>
-                </div>
+                            <div class="sparkline-wrapper">
+                                <svg viewBox="0 0 280 80" class="sparkline-svg" xmlns="http://www.w3.org/2000/svg">
+                                    <!-- Reference zone bands -->
+                                    <rect x="10" y={sparklineZoneGoodY} width="260" height={sparklineZoneGoodH}
+                                          fill="#22c55e" opacity="0.06" rx="2"/>
+                                    <rect x="10" y={sparklineZoneFairY} width="260" height={sparklineZoneFairH}
+                                          fill="#eab308" opacity="0.06" rx="2"/>
+                                    <rect x="10" y={sparklineZonePoorY} width="260" height={sparklineZonePoorH}
+                                          fill="#ef4444" opacity="0.06" rx="2"/>
 
-                <!-- ═══ RECOMMENDATION ═══ -->
-                <div class={recommendationClass}>
-                    <div class="recommendation-badge">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="ai-icon">
-                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                        </svg>
-                        <span>Agentforce Recommendation</span>
-                    </div>
-                    <h4 class="recommendation-title">{recommendation.title}</h4>
-                    <p class="recommendation-desc">{recommendation.description}</p>
-                    <div class="recommendation-action">
-                        <lightning-button
-                            label={recommendation.actionLabel}
-                            variant={recommendationButtonVariant}
-                            onclick={handleCreateWorkOrder}
-                            icon-name="utility:new"
-                        ></lightning-button>
-                    </div>
-                </div>
+                                    <!-- Zone labels -->
+                                    <text x="274" y={sparklineZoneGoodLabelY}
+                                          class="sparkline-zone-label" fill="#22c55e" text-anchor="end">GOOD</text>
+                                    <text x="274" y={sparklineZonePoorLabelY}
+                                          class="sparkline-zone-label" fill="#ef4444" text-anchor="end">RISK</text>
 
-                <!-- ═══ FOOTER ═══ -->
-                <div class="footer">
-                    <span class="last-calculated">Last calculated: {lastCalculated}</span>
-                </div>
+                                    <!-- Area fill -->
+                                    <polygon
+                                        points={sparklineAreaPoints}
+                                        fill="rgba(59, 130, 246, 0.10)"
+                                    />
+                                    <!-- Line -->
+                                    <polyline
+                                        points={sparklinePoints}
+                                        fill="none"
+                                        stroke="#3b82f6"
+                                        stroke-width="2"
+                                        stroke-linejoin="round"
+                                        stroke-linecap="round"
+                                    />
+                                    <!-- Dots and Labels -->
+                                    <template for:each={sparklineDots} for:item="dot">
+                                        <circle
+                                            key={dot.key}
+                                            cx={dot.cx}
+                                            cy={dot.cy}
+                                            r="3"
+                                            fill="#3b82f6"
+                                            stroke="white"
+                                            stroke-width="1.5"
+                                        />
+                                        <text
+                                            key={dot.label}
+                                            x={dot.labelX}
+                                            y={dot.labelY}
+                                            text-anchor="middle"
+                                            class="sparkline-label"
+                                        >
+                                            {dot.label}
+                                        </text>
+                                    </template>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- AGE & USAGE METRICS -->
+                        <div class="metrics-section">
+                            <h3 class="subsection-header">Age &amp; Usage</h3>
+                            <div class="metrics-grid">
+                                <template for:each={metrics} for:item="metric">
+                                    <div key={metric.key} class="metric-card" title={metric.description}>
+                                        <div class="metric-icon">
+                                            <lightning-icon icon-name={metric.icon} size="xx-small"></lightning-icon>
+                                        </div>
+                                        <div class="metric-info">
+                                            <span class="metric-label">{metric.label}</span>
+                                            <span class="metric-value">{metric.value}</span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- RECOMMENDATION -->
+                        <div class={recommendationClass}>
+                            <div class="recommendation-badge">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="ai-icon">
+                                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                                </svg>
+                                <span>Agentforce</span>
+                            </div>
+                            <h4 class="recommendation-title">{recommendation.title}</h4>
+                            <p class="recommendation-desc">{recommendation.description}</p>
+                            <div class="recommendation-action">
+                                <lightning-button
+                                    label={recommendation.actionLabel}
+                                    variant={recommendationButtonVariant}
+                                    onclick={handleCreateWorkOrder}
+                                    icon-name="utility:new"
+                                ></lightning-button>
+                            </div>
+                        </div>
+
+                        <!-- FOOTER -->
+                        <div class="footer">
+                            <span class="last-calculated">Last calculated: {lastCalculated}</span>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Collapsed footer -->
+                <template lwc:if={isDetailsCollapsed}>
+                    <div class="footer-collapsed">
+                        <span class="last-calculated">Last calculated: {lastCalculated}</span>
+                    </div>
+                </template>
             </div>
         </template>
     </lightning-card>

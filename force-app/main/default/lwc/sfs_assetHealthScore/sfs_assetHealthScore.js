@@ -4,16 +4,25 @@ import getHealthScore from '@salesforce/apex/AssetHealthScoreController.getHealt
 import resolveAssetId from '@salesforce/apex/AssetHealthScoreController.resolveAssetId';
 
 const SCORE_COLORS = {
-    critical: '#ef4444',
-    atRisk: '#f97316',
-    fair: '#eab308',
-    good: '#22c55e',
-    excellent: '#10b981'
+    critical: '#ea001e',
+    atRisk: '#fe5d00',
+    fair: '#e4a201',
+    good: '#2e844a',
+    excellent: '#0d9d57'
 };
 
 const GAUGE_RADIUS = 120;
 const GAUGE_CX = 150;
 const GAUGE_CY = 140;
+
+// Severity zone boundaries (score ranges) and colors for the gauge track
+const GAUGE_ZONES = [
+    { min: 0, max: 40, color: '#ef4444', key: 'zone-critical' },
+    { min: 40, max: 51, color: '#f97316', key: 'zone-atrisk' },
+    { min: 51, max: 71, color: '#eab308', key: 'zone-fair' },
+    { min: 71, max: 85, color: '#22c55e', key: 'zone-good' },
+    { min: 85, max: 100, color: '#10b981', key: 'zone-excellent' }
+];
 
 export default class Sfs_assetHealthScore extends NavigationMixin(LightningElement) {
     @api recordId;
@@ -24,6 +33,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
     animatedScore = 0;
     expandedFactors = {};
     resolvedAssetId;
+    isDetailsExpanded = false;
 
     // Step 1: Resolve the AssetId (handles both Asset and WorkOrder pages)
     @wire(resolveAssetId, { recordId: '$recordId' })
@@ -76,6 +86,12 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         requestAnimationFrame(step);
     }
 
+    // ─── Asset Name ──────────────────────────────────────────────
+
+    get assetName() {
+        return this.healthData?.assetName ?? 'Asset';
+    }
+
     // ─── Gauge Computed Properties ─────────────────────────────────
 
     get scoreColor() {
@@ -91,13 +107,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         return this.healthData?.scoreLabel ?? '';
     }
 
-    get scoreLabelClass() {
-        const label = (this.healthData?.scoreLabel ?? '').toLowerCase().replace(/\s+/g, '-');
-        return `score-label score-label--${label}`;
-    }
-
     get gaugeArcPath() {
-        // Semi-circle arc from left to right
         const startAngle = Math.PI;
         const endAngle = 0;
         const x1 = GAUGE_CX + GAUGE_RADIUS * Math.cos(startAngle);
@@ -123,7 +133,13 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
     get gaugeArcStyle() {
         const filled = this.gaugeFilledLength;
         const empty = this.gaugeEmptyLength;
-        return `stroke-dasharray: ${filled} ${empty}; filter: drop-shadow(0 0 6px ${this.scoreColor}80);`;
+        return `stroke-dasharray: ${filled} ${empty}; filter: drop-shadow(0 0 8px ${this.scoreColor}80);`;
+    }
+
+    get gaugeArcStyleClean() {
+        const filled = this.gaugeFilledLength;
+        const empty = this.gaugeEmptyLength;
+        return `stroke-dasharray: ${filled} ${empty};`;
     }
 
     get scoreDisplayX() {
@@ -138,7 +154,25 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         return GAUGE_CY + 25;
     }
 
-    // ─── Factors ───────────────────────────────────────────────────
+    // ─── Gauge Severity Zones ────────────────────────────────────
+
+    get gaugeZones() {
+        const totalArc = this.gaugeArcLength;
+        return GAUGE_ZONES.map((zone) => {
+            const startFraction = zone.min / 100;
+            const endFraction = zone.max / 100;
+            const segmentLength = (endFraction - startFraction) * totalArc;
+            const offset = startFraction * totalArc;
+            const gap = totalArc - segmentLength;
+            return {
+                key: zone.key,
+                color: zone.color,
+                dashStyle: `stroke-dasharray: ${segmentLength} ${gap}; stroke-dashoffset: -${offset};`
+            };
+        });
+    }
+
+    // ─── Factors ─────────────────────────────────────────────────
 
     get factors() {
         if (!this.healthData?.factors) return [];
@@ -152,6 +186,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
                 barClass: `factor-bar factor-bar--${f.status}`,
                 statusIcon: this.getStatusIcon(f.status),
                 statusClass: `factor-status factor-status--${f.status}`,
+                scoreClass: `factor-score factor-score--${f.status}`,
                 isExpanded,
                 expandIcon: isExpanded ? 'utility:chevrondown' : 'utility:chevronright',
                 weightLabel: `${f.weight}%`
@@ -173,13 +208,13 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         };
     }
 
-    // ─── Sparkline ─────────────────────────────────────────────────
+    // ─── Sparkline ──────────────────────────────────────────────
 
     get sparklinePoints() {
         if (!this.healthData?.trendData) return '';
         const data = this.healthData.trendData;
         const width = 280;
-        const height = 60;
+        const height = 68;
         const padding = 10;
 
         const xStep = (width - padding * 2) / (data.length - 1);
@@ -195,7 +230,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         if (!this.healthData?.trendData) return '';
         const data = this.healthData.trendData;
         const width = 280;
-        const height = 60;
+        const height = 68;
         const padding = 10;
 
         const xStep = (width - padding * 2) / (data.length - 1);
@@ -217,7 +252,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         if (!this.healthData?.trendData) return [];
         const data = this.healthData.trendData;
         const width = 280;
-        const height = 60;
+        const height = 68;
         const padding = 10;
         const xStep = (width - padding * 2) / (data.length - 1);
 
@@ -227,10 +262,34 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
             cy: height - padding - ((d.score / 100) * (height - padding * 2)),
             label: d.month,
             labelX: padding + i * xStep,
-            labelY: height + 2,
+            labelY: height + 6,
             score: d.score
         }));
     }
+
+    // ─── Sparkline Reference Zones ──────────────────────────────
+
+    _sparklineY(score) {
+        const height = 68;
+        const padding = 10;
+        return height - padding - ((score / 100) * (height - padding * 2));
+    }
+
+    // Good zone: 70-100
+    get sparklineZoneGoodY() { return this._sparklineY(100); }
+    get sparklineZoneGoodH() { return this._sparklineY(70) - this._sparklineY(100); }
+    get sparklineZoneGoodLabelY() { return this._sparklineY(85) + 2; }
+
+    // Fair zone: 40-70
+    get sparklineZoneFairY() { return this._sparklineY(70); }
+    get sparklineZoneFairH() { return this._sparklineY(40) - this._sparklineY(70); }
+
+    // Poor zone: 0-40
+    get sparklineZonePoorY() { return this._sparklineY(40); }
+    get sparklineZonePoorH() { return this._sparklineY(0) - this._sparklineY(40); }
+    get sparklineZonePoorLabelY() { return this._sparklineY(20) + 2; }
+
+    // ─── Trend ──────────────────────────────────────────────────
 
     get trendDirection() {
         if (!this.healthData?.trendData || this.healthData.trendData.length < 2) return '';
@@ -252,7 +311,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         return `trend-indicator trend-indicator--${this.trendDirection}`;
     }
 
-    // ─── Metrics ──────────────────────────────────────────────────
+    // ─── Metrics ────────────────────────────────────────────────
 
     get metrics() {
         if (!this.healthData?.metrics) return [];
@@ -262,7 +321,7 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         }));
     }
 
-    // ─── Recommendation ────────────────────────────────────────────
+    // ─── Recommendation ─────────────────────────────────────────
 
     get recommendation() {
         return this.healthData?.recommendation;
@@ -294,7 +353,27 @@ export default class Sfs_assetHealthScore extends NavigationMixin(LightningEleme
         });
     }
 
-    // ─── Misc ──────────────────────────────────────────────────────
+    // ─── Details Expand/Collapse ────────────────────────────────
+
+    handleDetailsToggle() {
+        this.isDetailsExpanded = !this.isDetailsExpanded;
+    }
+
+    get isDetailsCollapsed() {
+        return !this.isDetailsExpanded;
+    }
+
+    get detailsToggleLabel() {
+        return this.isDetailsExpanded ? 'Hide Details' : 'Show Details';
+    }
+
+    get detailsToggleIconClass() {
+        return this.isDetailsExpanded
+            ? 'details-toggle-icon details-toggle-icon--open'
+            : 'details-toggle-icon';
+    }
+
+    // ─── Misc ───────────────────────────────────────────────────
 
     get lastCalculated() {
         if (!this.healthData?.lastCalculated) return '';
