@@ -1,8 +1,8 @@
 {
   "packageDirectories": [
     {
-      "versionName": "v1.0",
-      "versionNumber": "1.0.0.NEXT",
+      "versionName": "v2.0",
+      "versionNumber": "2.0.0.NEXT",
       "path": "force-app",
       "default": true,
       "package": "Enhanced Asset Health Score",
@@ -15,6 +15,7 @@
   "sourceApiVersion": "62.0",
   "packageAliases": {
     "Enhanced Asset Health Score": "0HoKa000000sgNHKAY",
-    "Enhanced Asset Health Score@1.0.0-1": "04tKa000002znWHIAY"
+    "Enhanced Asset Health Score@1.0.0-1": "04tKa000002znWHIAY",
+    "Enhanced Asset Health Score@2.0.0-1": "04tKa000002znjOIAQ"
   }
 }
